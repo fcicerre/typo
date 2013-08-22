@@ -31,6 +31,15 @@ module WithinHelpers
 end
 World(WithinHelpers)
 
+class Context
+  def self.other_article_id=(value)
+    @@other_article_id = value
+  end
+  def self.other_article_id()
+    @@other_article_id
+  end
+end
+
 Given /^the blog is set up$/ do
   Blog.default.update_attributes!({:blog_name => 'Teh Blag',
                                    :base_url => 'http://localhost:3000'});
@@ -41,9 +50,15 @@ Given /^the blog is set up$/ do
                 :profile_id => 1,
                 :name => 'admin',
                 :state => 'active'})
+  User.create!({:login => 'publisher',
+                :password => 'aaaaaaaa',
+                :email => 'joe@rain.com',
+                :profile_id => 2,
+                :name => 'publisher',
+                :state => 'active'})
 end
 
-And /^I am logged into the admin panel$/ do
+Given /^I am logged into the admin panel$/ do
   visit '/accounts/login'
   fill_in 'user_login', :with => 'admin'
   fill_in 'user_password', :with => 'aaaaaaaa'
@@ -53,6 +68,43 @@ And /^I am logged into the admin panel$/ do
   else
     assert page.has_content?('Login successful')
   end
+end
+
+Given /^I am logged into the publisher panel$/ do
+  visit '/accounts/login'
+  fill_in 'user_login', :with => 'publisher'
+  fill_in 'user_password', :with => 'aaaaaaaa'
+  click_button 'Login'
+  if page.respond_to? :should
+    page.should have_content('Login successful')
+  else
+    assert page.has_content?('Login successful')
+  end
+end
+
+Given /^I write the "([^"]*)" article with the "([^"]*)" body$/ do |title, body|
+  visit '/admin/content/new'
+  fill_in 'article_title', :with => title
+  fill_in 'article__body_and_extended_editor', :with => body
+  click_button 'Publish'
+end
+
+Given /^I write the "([^"]*)" comment for the "([^"]*)" article$/ do |comment_body, article_title|
+  visit '/'
+  click_link article_title
+  fill_in 'comment_author', :with => 'Someone'
+  fill_in 'comment_email', :with => 'someone@somewhere'
+  fill_in 'comment_body', :with => comment_body
+  click_button 'comment'
+end
+
+Then /^I will save the Id of the "([^"]*)" article$/ do |article_title|
+  art = Article.where({:title => article_title}).first
+  Context.other_article_id = art.id
+end
+
+When /^I fill in "([^"]*)" with the saved Id$/ do |field_name|
+  fill_in field_name, :with => Context.other_article_id
 end
 
 # Single-line step scoper
@@ -250,7 +302,7 @@ Then /^the "([^"]*)" checkbox(?: within (.*))? should not be checked$/ do |label
     end
   end
 end
- 
+
 Then /^(?:|I )should be on (.+)$/ do |page_name|
   current_path = URI.parse(current_url).path
   if current_path.respond_to? :should
@@ -264,8 +316,8 @@ Then /^(?:|I )should have the following query string:$/ do |expected_pairs|
   query = URI.parse(current_url).query
   actual_params = query ? CGI.parse(query) : {}
   expected_params = {}
-  expected_pairs.rows_hash.each_pair{|k,v| expected_params[k] = v.split(',')} 
-  
+  expected_pairs.rows_hash.each_pair{|k,v| expected_params[k] = v.split(',')}
+
   if actual_params.respond_to? :should
     actual_params.should == expected_params
   else

@@ -12,7 +12,7 @@ class AccountsController < ApplicationController
   end
 
   def login
-    if session[:user_id] && session[:user_id] == self.current_user.id
+    if session[:user_id] && self.current_user.class == User && session[:user_id] == self.current_user.id
       redirect_back_or_default :controller => "admin/dashboard", :action => "index"
       return
     end

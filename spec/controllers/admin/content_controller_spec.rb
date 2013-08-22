@@ -48,7 +48,7 @@ describe Admin::ContentController do
       response.should render_template('index')
       response.should be_success
     end
-    
+
     it 'should restrict to withdrawn articles' do
       article = Factory(:article, :state => 'withdrawn', :published_at => '2010-01-01')
       get :index, :search => {:state => 'withdrawn'}
@@ -56,7 +56,7 @@ describe Admin::ContentController do
       response.should render_template('index')
       response.should be_success
     end
-  
+
     it 'should restrict to withdrawn articles' do
       article = Factory(:article, :state => 'withdrawn', :published_at => '2010-01-01')
       get :index, :search => {:state => 'withdrawn'}
@@ -669,6 +669,48 @@ describe Admin::ContentController do
         end.should_not change(Article, :count)
       end
 
+    end
+  end
+
+  describe 'with admin connection' do
+    before do
+      Factory(:blog)
+      #TODO delete this after remove fixture
+      Profile.delete_all
+      @user_admin = Factory(:user, :text_filter => Factory(:markdown), :profile => Factory(:profile_admin, :label => Profile::ADMIN))
+      @user_admin.editor = 'simple'
+      @user_admin.save
+      @user_published = Factory(:user, :text_filter => Factory(:markdown), :profile => Factory(:profile_publisher))
+      #@article = Factory(:article)
+      request.session = { :user => @user_admin.id }
+    end
+
+    describe 'merge_with action' do
+      before :each do
+        Factory(:article, :title => "Title 1", :author => "Author 1", :user => @user_admin)
+        Factory(:article, :title => "Title 2", :author => "Author 2", :user => @user_publisher)
+        @article1 = Article.where(:title => 'Title 1').first
+        @article2 = Article.where(:title => 'Title 2').first
+      end
+
+      it 'should find article with id' do
+        Article.should_receive(:find).with(@article1.id).and_return(@article1)
+        @article1.stub(:merge_with)
+        post :merge, {:id => @article1.id, :merge_with => @article2.id.to_s}
+      end
+
+      it 'should call merge with in the model' do
+        Article.stub(:find).and_return(@article1)
+        @article1.should_receive(:merge_with).with(@article2.id)
+        post :merge, {:id => @article1.id, :merge_with => @article2.id.to_s}
+      end
+
+      it 'should redirect to index' do
+        Article.stub(:find).and_return(@article1)
+        @article1.stub(:merge_with)
+        post :merge, {:id => @article1.id, :merge_with => @article2.id.to_s}
+        response.should redirect_to(:action => 'index')
+      end
     end
   end
 end
